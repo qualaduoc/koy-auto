@@ -31,6 +31,7 @@ jobs:
           ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: KoY-Auto-Debug-APK
