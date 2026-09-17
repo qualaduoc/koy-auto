@@ -1,8 +1,11 @@
 package com.koy.auto.presentation
 
+import android.app.Activity
 import android.content.Context
 import android.hardware.display.DisplayManager
+import android.os.Build
 import android.view.Display
+import android.view.WindowManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -45,6 +48,16 @@ class CarDisplayManager(private val context: Context) : DisplayManager.DisplayLi
 
         try {
             activePresentation = CarPresentation(context, display).apply {
+                if (context !is Activity) {
+                    window?.setType(
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                        } else {
+                            @Suppress("DEPRECATION")
+                            WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
+                        }
+                    )
+                }
                 show()
             }
             _isCarConnected.value = true
