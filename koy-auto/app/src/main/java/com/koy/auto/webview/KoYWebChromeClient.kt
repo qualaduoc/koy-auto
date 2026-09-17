@@ -2,12 +2,18 @@ package com.koy.auto.webview
 
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 
 class KoYWebChromeClient(
     private val customViewContainer: ViewGroup,
     private val onFullscreenChanged: (Boolean) -> Unit
 ) : WebChromeClient() {
+
+    override fun onPermissionRequest(request: PermissionRequest?) {
+        // Automatically grant audio capture permission for YouTube Voice Search
+        request?.grant(request.resources)
+    }
 
     private var customView: View? = null
     private var customViewCallback: CustomViewCallback? = null

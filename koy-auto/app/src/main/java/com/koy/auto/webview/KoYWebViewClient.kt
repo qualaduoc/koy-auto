@@ -29,13 +29,15 @@ class KoYWebViewClient(
         val url = request?.url?.toString() ?: return false
         val uri = Uri.parse(url)
 
-        // Prevent opening external YouTube app; keep browsing inside KoY-Auto
-        if (uri.scheme == "vnd.youtube" || uri.scheme == "intent") {
+        // Block external intents and opening outside apps (keep inside KoY-Auto)
+        val scheme = uri.scheme?.lowercase() ?: ""
+        if (scheme == "vnd.youtube" || scheme == "intent" || scheme == "market") {
             return true
         }
 
-        view?.loadUrl(url)
-        return true
+        // Allow normal web navigation (http, https, javascript, about)
+        // Returning false lets Chromium internal engine handle clicks, SPA navigation, and History API
+        return false
     }
 
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {

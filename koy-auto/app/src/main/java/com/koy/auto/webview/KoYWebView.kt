@@ -3,10 +3,13 @@ package com.koy.auto.webview
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.AttributeSet
+import android.view.MotionEvent
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.WebSettings
 import android.webkit.WebView
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
 import com.koy.auto.util.Constants
 
 class KoYWebView @JvmOverloads constructor(
@@ -16,7 +19,27 @@ class KoYWebView @JvmOverloads constructor(
 ) : WebView(context, attrs, defStyleAttr) {
 
     init {
+        isFocusable = true
+        isFocusableInTouchMode = true
         setupSettings()
+        setupFocusHandling()
+    }
+
+    private fun setupFocusHandling() {
+        setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP -> {
+                    if (!v.hasFocus()) {
+                        v.requestFocus()
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    override fun onCheckIsTextEditor(): Boolean {
+        return true
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -54,6 +77,11 @@ class KoYWebView @JvmOverloads constructor(
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(this, true)
+
+        // Remove X-Requested-With header so YouTube treats this as genuine Chrome browser
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {
+            WebSettingsCompat.setRequestedWithHeaderOriginAllowList(settings, emptySet())
+        }
     }
 
     fun setDesktopMode(enabled: Boolean) {

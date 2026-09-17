@@ -29,6 +29,23 @@ class KoYMediaService : MediaBrowserServiceCompat() {
                 .setState(PlaybackStateCompat.STATE_PLAYING, 0, 1.0f)
 
             setPlaybackState(stateBuilder.build())
+
+            setCallback(object : MediaSessionCompat.Callback() {
+                override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
+                    val targetUrl = when (mediaId) {
+                        "music" -> com.koy.auto.util.Constants.URL_DRIVER_MUSIC
+                        "news" -> com.koy.auto.util.Constants.URL_VOV_NEWS
+                        "podcast" -> com.koy.auto.util.Constants.URL_PODCAST
+                        else -> com.koy.auto.util.Constants.YOUTUBE_URL_MOBILE
+                    }
+                    val intent = android.content.Intent(this@KoYMediaService, CarProjectionService::class.java).apply {
+                        action = com.koy.auto.util.Constants.ACTION_LOAD_URL
+                        putExtra(com.koy.auto.util.Constants.EXTRA_URL, targetUrl)
+                    }
+                    startService(intent)
+                }
+            })
+
             isActive = true
         }
 
@@ -50,8 +67,23 @@ class KoYMediaService : MediaBrowserServiceCompat() {
         parentId: String,
         result: Result<MutableList<MediaBrowserCompat.MediaItem>>
     ) {
-        // Return empty list or basic shortcuts
-        result.sendResult(mutableListOf())
+        val mediaItems = mutableListOf<MediaBrowserCompat.MediaItem>()
+
+        fun createItem(id: String, title: String, subtitle: String): MediaBrowserCompat.MediaItem {
+            val desc = android.support.v4.media.MediaDescriptionCompat.Builder()
+                .setMediaId(id)
+                .setTitle(title)
+                .setSubtitle(subtitle)
+                .build()
+            return MediaBrowserCompat.MediaItem(desc, MediaBrowserCompat.MediaItem.FLAG_PLAYABLE)
+        }
+
+        mediaItems.add(createItem("music", "🎵 Nhạc Lái Xe", "YouTube Lo-fi không lời"))
+        mediaItems.add(createItem("news", "📻 VOV Giao Thông", "Tin tức giao thông trực tiếp"))
+        mediaItems.add(createItem("podcast", "🎙️ Sách Nói & Podcast", "Kinh doanh, kỹ năng sống"))
+        mediaItems.add(createItem("youtube", "▶️ Trình phát YouTube", "Phát luồng từ điện thoại"))
+
+        result.sendResult(mediaItems)
     }
 
     override fun onDestroy() {

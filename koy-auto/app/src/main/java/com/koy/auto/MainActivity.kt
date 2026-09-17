@@ -1,15 +1,19 @@
 package com.koy.auto
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.koy.auto.databinding.ActivityMainBinding
@@ -51,6 +55,7 @@ class MainActivity : AppCompatActivity() {
         setupPhoneWebView()
         setupListeners()
         handleIncomingIntent(intent)
+        checkPermissions()
     }
 
     override fun onStart() {
@@ -186,6 +191,21 @@ class MainActivity : AppCompatActivity() {
             binding.phoneWebView.goBack()
         } else {
             super.onBackPressed()
+        }
+    }
+
+    private fun checkPermissions() {
+        val permissionsToRequest = mutableListOf<String>()
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.RECORD_AUDIO)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+        if (permissionsToRequest.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, permissionsToRequest.toTypedArray(), 1002)
         }
     }
 
