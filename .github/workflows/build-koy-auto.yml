@@ -28,16 +28,17 @@ jobs:
       - name: Build Debug APK
         run: |
           cd koy-auto
-          if ! ./gradlew assembleDebug --stacktrace > ../build_output.txt 2>&1; then
-            echo "### Gradle Build Failed" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            tail -n 100 ../build_output.txt >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            tail -n 100 ../build_output.txt
-            exit 1
-          fi
+          ./gradlew assembleDebug --stacktrace > ../build_output.txt 2>&1 || (cat ../build_output.txt && exit 1)
+
+      - name: Upload Build Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build_output.txt
 
       - name: Upload APK Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: KoY-Auto-Debug-APK
