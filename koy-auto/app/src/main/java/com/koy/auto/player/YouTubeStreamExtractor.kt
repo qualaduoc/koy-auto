@@ -28,7 +28,7 @@ object YouTubeStreamExtractor {
         .build()
 
     private val VIDEO_ID_REGEX = Pattern.compile(
-        "^.*(?:(?:youtu\\.be\\/|v\\/|vi\\/|u\\/\\w\\/|embed\\/|shorts\\/)|(?:(?:watch)?\\?v(?:i)?=|\\&v(?:i)?=))([^#\\&\\?]*).*"
+        "^.*(?:(?:youtu\\.be\\/|v\\/|vi\\/|u\\/\\w\\/|embed\\/|shorts\\/|live\\/)|(?:(?:watch)?\\?v(?:i)?=|\\&v(?:i)?=))([^#\\&\\?]*).*"
     )
 
     fun extractVideoId(urlOrId: String): String? {
@@ -45,13 +45,16 @@ object YouTubeStreamExtractor {
         }
     }
 
-    suspend fun extractStream(urlOrId: String): Result<StreamInfo> = withContext(Dispatchers.IO) {
+    suspend fun extractStream(
+        urlOrId: String,
+        audioOnly: Boolean = false
+    ): Result<StreamInfo> = withContext(Dispatchers.IO) {
         val videoId = extractVideoId(urlOrId)
             ?: return@withContext Result.failure(IllegalArgumentException("Không tìm thấy YouTube Video ID hợp lệ"))
 
         // 1. Thử lấy luồng trực tiếp qua YouTube InnerTube Android API
         try {
-            val innerTubeResult = fetchFromInnerTube(videoId)
+            val innerTubeResult = fetchFromInnerTube(videoId, audioOnly)
             if (innerTubeResult.isSuccess) {
                 return@withContext innerTubeResult
             }
@@ -61,7 +64,7 @@ object YouTubeStreamExtractor {
 
         // 2. Dự phòng: Lấy luồng qua các cụm Piped API mở nếu InnerTube gặp captcha/chặn
         try {
-            val pipedResult = fetchFromPipedApi(videoId)
+            val pipedResult = fetchFromPipedApi(videoId, audioOnly)
             if (pipedResult.isSuccess) {
                 return@withContext pipedResult
             }
@@ -72,7 +75,7 @@ object YouTubeStreamExtractor {
         Result.failure(Exception("Không thể trích xuất luồng video cho ID: $videoId"))
     }
 
-    private fun fetchFromInnerTube(videoId: String): Result<StreamInfo> {
+    private fun fetchFromInnerTube(videoId: String, audioOnly: Boolean): Result<StreamInfo> {
         val endpoint = "https://www.youtube.com/youtubei/v1/player"
         val payload = JSONObject().apply {
             put("videoId", videoId)
@@ -117,6 +120,36 @@ object YouTubeStreamExtractor {
             }
 
             val streamingData = json.optJSONObject("streamingData") ?: return Result.failure(Exception("Không có streamingData"))
+
+            if (audioOnly) {
+                val adaptiveFormats = streamingData.optJSONArray("adaptiveFormats")
+                var audioUrl: String? = null
+                var bestBitrate = -1
+                if (adaptiveFormats != null) {
+                    for (i in 0 until adaptiveFormats.length()) {
+                        val format = adaptiveFormats.getJSONObject(i)
+                        val mimeType = format.optString("mimeType")
+                        val url = format.optString("url")
+                        val bitrate = format.optInt("bitrate", 0)
+                        if (mimeType.startsWith("audio/") && url.isNotEmpty() && bitrate > bestBitrate) {
+                            audioUrl = url
+                            bestBitrate = bitrate
+                        }
+                    }
+                }
+                if (!audioUrl.isNullOrEmpty()) {
+                    return Result.success(
+                        StreamInfo(
+                            videoId = videoId,
+                            title = title,
+                            author = author,
+                            streamUrl = audioUrl,
+                            thumbnailUrl = thumbUrl,
+                            durationSeconds = durationSec
+                        )
+                    )
+                }
+            }
 
             // 1. Kiểm tra luồng HLS (.m3u8) - Tốt nhất cho ExoPlayer tự co giãn 720p/1080p
             val hlsManifestUrl = streamingData.optString("hlsManifestUrl")
@@ -172,7 +205,7 @@ object YouTubeStreamExtractor {
         return Result.failure(Exception("Không tìm thấy link phát trực tiếp trong InnerTube"))
     }
 
-    private fun fetchFromPipedApi(videoId: String): Result<StreamInfo> {
+    private fun fetchFromPipedApi(videoId: String, audioOnly: Boolean): Result<StreamInfo> {
         val instances = listOf(
             "https://pipedapi.kavin.rocks",
             "https://api.piped.privacydev.net",
@@ -196,6 +229,35 @@ object YouTubeStreamExtractor {
                     val author = json.optString("uploader", "KoY Auto")
                     val duration = json.optLong("duration", 0L)
                     val thumbnail = json.optString("thumbnailUrl")
+
+                    if (audioOnly) {
+                        val audioStreams = json.optJSONArray("audioStreams")
+                        var audioUrl: String? = null
+                        var bestBitrate = -1
+                        if (audioStreams != null) {
+                            for (i in 0 until audioStreams.length()) {
+                                val stream = audioStreams.getJSONObject(i)
+                                val url = stream.optString("url")
+                                val bitrate = stream.optInt("bitrate", 0)
+                                if (url.isNotEmpty() && bitrate > bestBitrate) {
+                                    audioUrl = url
+                                    bestBitrate = bitrate
+                                }
+                            }
+                        }
+                        if (!audioUrl.isNullOrEmpty()) {
+                            return Result.success(
+                                StreamInfo(
+                                    videoId = videoId,
+                                    title = title,
+                                    author = author,
+                                    streamUrl = audioUrl,
+                                    thumbnailUrl = thumbnail,
+                                    durationSeconds = duration
+                                )
+                            )
+                        }
+                    }
 
                     // HLS Stream
                     val hlsUrl = json.optString("hls")

@@ -2,18 +2,20 @@ package com.koy.auto
 
 import android.Manifest
 import android.app.PictureInPictureParams
-import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.hardware.display.DisplayManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.provider.Settings
 import android.util.Rational
+import android.view.Display
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
@@ -34,20 +36,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private var projectionService: CarProjectionService? = null
     private var isBound = false
-
-    private val playbackReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == Constants.ACTION_TOGGLE_PLAYBACK) {
-                togglePlayback()
-            }
-        }
-    }
+    private var requestedOverlayPermission = false
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             val binder = service as CarProjectionService.LocalBinder
             projectionService = binder.getService()
             isBound = true
+            ensureExternalDisplayPermission()
             observeCarStatus()
         }
 
@@ -65,14 +61,6 @@ class MainActivity : AppCompatActivity() {
         // Ensure background projection service is running
         CarProjectionService.start(this)
 
-        // Đăng ký nhận sự kiện điều khiển Play/Pause từ thông báo Notification
-        val filter = IntentFilter(Constants.ACTION_TOGGLE_PLAYBACK)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(playbackReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(playbackReceiver, filter)
-        }
-
         setupPhoneWebView()
         setupListeners()
         handleIncomingIntent(intent)
@@ -83,6 +71,11 @@ class MainActivity : AppCompatActivity() {
         super.onStart()
         val intent = Intent(this, CarProjectionService::class.java)
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ensureExternalDisplayPermission()
     }
 
     override fun onPause() {
@@ -98,24 +91,6 @@ class MainActivity : AppCompatActivity() {
         }
         binding.phoneWebView.resumeTimers()
         super.onStop()
-    }
-
-    private fun togglePlayback() {
-        val jsToggle = """
-            (function() {
-                var v = document.querySelector('video');
-                if (v) {
-                    if (v.paused) {
-                        window._koyUserWantsPause = false;
-                        v.play();
-                    } else {
-                        window._koyUserWantsPause = true;
-                        v.pause();
-                    }
-                }
-            })();
-        """.trimIndent()
-        binding.phoneWebView.evaluateJavascript(jsToggle, null)
     }
 
     private fun setupPhoneWebView() {
@@ -142,7 +117,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.chipMusic.setOnClickListener {
             com.koy.auto.player.KoYPlayerManager.playPredefined("music")
-            Toast.makeText(this, "Đang phát: 🎵 Nhạc Lái Xe Lo-fi", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Đang phát: 🎵 VOV3 Âm Nhạc", Toast.LENGTH_SHORT).show()
         }
 
         binding.chipNews.setOnClickListener {
@@ -152,7 +127,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.chipPodcast.setOnClickListener {
             com.koy.auto.player.KoYPlayerManager.playPredefined("podcast")
-            Toast.makeText(this, "Đang phát: 🎙️ Sách Nói & Podcast", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Đang phát: 🎙️ VOV2 Văn Hóa & Xã Hội", Toast.LENGTH_SHORT).show()
         }
 
         binding.switchAdBlock.setOnCheckedChangeListener { _, isChecked ->
@@ -175,26 +150,26 @@ class MainActivity : AppCompatActivity() {
         val videoId = com.koy.auto.player.YouTubeStreamExtractor.extractVideoId(urlOrSearch)
 
         if (videoId != null) {
-            // Phát luồng trực tiếp qua ExoPlayer phần cứng (siêu nhẹ, không giật lag)
-            Toast.makeText(this, "Đang giải mã và phát video siêu nhẹ...", Toast.LENGTH_SHORT).show()
-            com.koy.auto.player.KoYPlayerManager.playYouTube(
-                urlOrId = urlOrSearch,
-                onStart = {
-                    this@MainActivity.runOnUiThread {
-                        Toast.makeText(this@MainActivity, "Đang phát 60 FPS mượt mà!", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                onError = { errMsg ->
-                    this@MainActivity.runOnUiThread {
-                        Toast.makeText(this@MainActivity, "Lỗi: $errMsg", Toast.LENGTH_LONG).show()
-                    }
-                }
-            )
-
-
-            // Đồng thời xuất lên màn hình xe nếu đang kết nối
+            Toast.makeText(this, "Đang chuẩn bị luồng phát nền...", Toast.LENGTH_SHORT).show()
             if (projectionService?.carDisplayManager?.isCarConnected?.value == true) {
+                // CarPresentation owns the one native playback request and its PlayerView.
                 projectionService?.carDisplayManager?.loadUrlOnCar(urlOrSearch)
+            } else {
+                // Without a secondary display, keep native audio alive in the foreground service.
+                com.koy.auto.player.KoYPlayerManager.playYouTube(
+                    urlOrId = urlOrSearch,
+                    audioOnly = true,
+                    onStart = {
+                        this@MainActivity.runOnUiThread {
+                            Toast.makeText(this@MainActivity, "Đang phát nền", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    onError = { errMsg ->
+                        this@MainActivity.runOnUiThread {
+                            Toast.makeText(this@MainActivity, "Không thể mở luồng: $errMsg", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                )
             }
             return
         }
@@ -202,7 +177,7 @@ class MainActivity : AppCompatActivity() {
         val targetUrl = if (urlOrSearch.startsWith("http://") || urlOrSearch.startsWith("https://")) {
             urlOrSearch
         } else {
-            Constants.YOUTUBE_SEARCH_PREFIX + urlOrSearch
+            Constants.YOUTUBE_SEARCH_PREFIX + Uri.encode(urlOrSearch)
         }
 
         // 1. If car is connected, send to car display
@@ -248,6 +223,35 @@ class MainActivity : AppCompatActivity() {
         val layoutParams = window.attributes
         layoutParams.screenBrightness = if (dim) 0.01f else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
         window.attributes = layoutParams
+    }
+
+    private fun ensureExternalDisplayPermission() {
+        val displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        val hasPresentationDisplay = displayManager
+            .getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
+            .any { it.displayId != Display.DEFAULT_DISPLAY }
+
+        if (!hasPresentationDisplay) return
+
+        if (Settings.canDrawOverlays(this)) {
+            projectionService?.carDisplayManager?.refreshDisplays()
+            return
+        }
+
+        if (!requestedOverlayPermission) {
+            requestedOverlayPermission = true
+            Toast.makeText(
+                this,
+                "Cho phép hiển thị trên ứng dụng khác để xuất hình ra màn hình phụ",
+                Toast.LENGTH_LONG
+            ).show()
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+            )
+        }
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -318,11 +322,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        try {
-            unregisterReceiver(playbackReceiver)
-        } catch (e: Exception) {
-            // Ignore
-        }
         binding.phoneWebView.cleanUp()
         super.onDestroy()
     }

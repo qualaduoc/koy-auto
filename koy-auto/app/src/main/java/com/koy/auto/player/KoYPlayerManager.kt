@@ -90,6 +90,7 @@ object KoYPlayerManager {
                         error.printStackTrace()
                         _isPlaying.value = false
                         _isBuffering.value = false
+                        notifySessionUpdate()
                     }
                 })
             }
@@ -125,8 +126,6 @@ object KoYPlayerManager {
             val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(url))
             if (isHls || url.contains(".m3u8")) {
                 mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
-            } else {
-                mediaItemBuilder.setMimeType(MimeTypes.VIDEO_MP4)
             }
 
             val info = StreamInfo(
@@ -148,12 +147,13 @@ object KoYPlayerManager {
 
     fun playYouTube(
         urlOrId: String,
+        audioOnly: Boolean = false,
         onStart: (() -> Unit)? = null,
         onError: ((String) -> Unit)? = null
     ) {
         scope.launch {
             _isBuffering.value = true
-            val result = YouTubeStreamExtractor.extractStream(urlOrId)
+            val result = YouTubeStreamExtractor.extractStream(urlOrId, audioOnly)
             _isBuffering.value = false
 
             if (result.isSuccess) {
@@ -182,28 +182,28 @@ object KoYPlayerManager {
             "news" -> {
                 // VOV Giao thông Hà Nội (91 MHz) trực tiếp
                 playDirectStream(
-                    url = "https://radiovovlive.vov.vn/vovgt-hn",
+                    url = "https://play.vovgiaothong.vn/live/gthn/playlist.m3u8",
                     title = "📻 VOV Giao Thông (Trực tiếp)",
                     artist = "Đài Tiếng Nói Việt Nam (91.0 MHz)",
-                    isHls = false
+                    isHls = true
                 )
             }
             "music" -> {
-                // Nhạc lái xe Lo-fi thư giãn chất lượng cao
+                // Official VOV3 music HLS stream.
                 playDirectStream(
-                    url = "https://stream.zeno.fm/f3wvbbqmdg8uv",
-                    title = "🎵 Nhạc Lái Xe Thư Giãn",
-                    artist = "KoY Auto Lofi Chill",
-                    isHls = false
+                    url = "https://str.vov.gov.vn/vovlive/vov3.sdp_aac/playlist.m3u8",
+                    title = "🎵 VOV3 Âm Nhạc",
+                    artist = "Đài Tiếng Nói Việt Nam",
+                    isHls = true
                 )
             }
             "podcast" -> {
-                // Sách nói & Podcast kinh doanh kỹ năng sống
+                // Official VOV2 culture and society HLS stream.
                 playDirectStream(
-                    url = "https://stream.zeno.fm/0r0xa792kwzuv",
-                    title = "🎙️ Sách Nói & Kỹ Năng Lái Xe",
-                    artist = "KoY Auto Podcast",
-                    isHls = false
+                    url = "https://str.vov.gov.vn/vovlive/vov2.sdp_aac/playlist.m3u8",
+                    title = "🎙️ VOV2 Văn Hóa & Xã Hội",
+                    artist = "Đài Tiếng Nói Việt Nam",
+                    isHls = true
                 )
             }
             else -> {
@@ -219,12 +219,13 @@ object KoYPlayerManager {
 
     fun togglePlayPause() {
         mainHandler.post {
-            exoPlayer?.let {
-                if (it.isPlaying) {
-                    it.pause()
-                } else {
-                    it.play()
-                }
+            val player = exoPlayer ?: return@post
+            if (player.mediaItemCount == 0) {
+                playPredefined("music")
+            } else if (player.isPlaying) {
+                player.pause()
+            } else {
+                player.play()
             }
         }
     }
@@ -234,7 +235,22 @@ object KoYPlayerManager {
     }
 
     fun resume() {
-        mainHandler.post { exoPlayer?.play() }
+        mainHandler.post {
+            val player = exoPlayer ?: return@post
+            if (player.mediaItemCount == 0) {
+                playPredefined("music")
+            } else {
+                player.play()
+            }
+        }
+    }
+
+    fun stop() {
+        mainHandler.post {
+            exoPlayer?.stop()
+            _isPlaying.value = false
+            notifySessionUpdate()
+        }
     }
 
     fun seekForward(ms: Long = 10_000L) {

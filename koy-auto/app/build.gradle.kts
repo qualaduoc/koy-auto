@@ -49,6 +49,7 @@ dependencies {
 
     // Media3 ExoPlayer Engine for High-Performance, Zero-Lag Playback
     implementation("androidx.media3:media3-exoplayer:1.2.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.2.1")
     implementation("androidx.media3:media3-ui:1.2.1")
     implementation("androidx.media3:media3-session:1.2.1")
     implementation("androidx.media3:media3-common:1.2.1")
@@ -56,5 +57,6 @@ dependencies {
 
     // OkHttp for ultra-fast stream extraction
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-}
 
+    testImplementation("junit:junit:4.13.2")
+}

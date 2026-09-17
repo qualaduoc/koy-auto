@@ -11,7 +11,7 @@
     <string name="status_car_disconnected">Chưa kết nối màn hình ô tô</string>
     <string name="adblock_active">Chặn quảng cáo: BẬT</string>
     <string name="adblock_inactive">Chặn quảng cáo: TẮT</string>
-    <string name="quick_music">🎵 Nhạc Lái Xe</string>
+    <string name="quick_music">🎵 VOV3 Âm Nhạc</string>
     <string name="quick_news">📻 VOV / Tin Tức</string>
-    <string name="quick_podcast">🎙️ Sách Nói / Podcast</string>
+    <string name="quick_podcast">🎙️ VOV2 Văn Hóa</string>
 </resources>

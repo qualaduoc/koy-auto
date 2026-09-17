@@ -19,7 +19,7 @@ class CarDisplayManager(private val context: Context) : DisplayManager.DisplayLi
 
     fun startListening() {
         displayManager.registerDisplayListener(this, null)
-        checkCurrentDisplays()
+        refreshDisplays()
     }
 
     fun stopListening() {
@@ -27,10 +27,9 @@ class CarDisplayManager(private val context: Context) : DisplayManager.DisplayLi
         dismissPresentation()
     }
 
-    private fun checkCurrentDisplays() {
+    fun refreshDisplays() {
         val displays = displayManager.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
         val targetDisplay = displays.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
-            ?: displayManager.displays.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
 
         if (targetDisplay != null) {
             showPresentation(targetDisplay)
@@ -92,8 +91,10 @@ class CarDisplayManager(private val context: Context) : DisplayManager.DisplayLi
     }
 
     override fun onDisplayAdded(displayId: Int) {
-        val display = displayManager.getDisplay(displayId)
-        if (display != null && display.displayId != Display.DEFAULT_DISPLAY) {
+        val display = displayManager
+            .getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
+            .firstOrNull { it.displayId == displayId }
+        if (display != null) {
             showPresentation(display)
         }
     }

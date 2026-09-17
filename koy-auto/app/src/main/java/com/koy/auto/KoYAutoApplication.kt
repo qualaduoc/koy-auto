@@ -7,10 +7,11 @@ class KoYAutoApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Enable remote debugging of WebView via Chrome devtools on PC (chrome://inspect)
-        WebView.setWebContentsDebuggingEnabled(true)
+        // Never expose WebView contents/cookies through chrome://inspect in release builds.
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
 
         // Initialize Media3 ExoPlayer Engine
         com.koy.auto.player.KoYPlayerManager.initialize(this)
+        com.koy.auto.service.KoYMediaSessionManager.initialize(this)
     }
 }

@@ -1,9 +1,12 @@
 package com.koy.auto.webview
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
+import androidx.core.content.ContextCompat
 
 class KoYWebChromeClient(
     private val customViewContainer: ViewGroup,
@@ -11,8 +14,20 @@ class KoYWebChromeClient(
 ) : WebChromeClient() {
 
     override fun onPermissionRequest(request: PermissionRequest?) {
-        // Automatically grant audio capture permission for YouTube Voice Search
-        request?.grant(request.resources)
+        val permissionRequest = request ?: return
+        val canRecordAudio = ContextCompat.checkSelfPermission(
+            customViewContainer.context,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        val requestedAudio = permissionRequest.resources
+            .filter { it == PermissionRequest.RESOURCE_AUDIO_CAPTURE }
+            .toTypedArray()
+
+        if (canRecordAudio && requestedAudio.isNotEmpty()) {
+            permissionRequest.grant(requestedAudio)
+        } else {
+            permissionRequest.deny()
+        }
     }
 
     private var customView: View? = null
