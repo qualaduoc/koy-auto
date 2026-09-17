@@ -28,10 +28,27 @@ jobs:
       - name: Test, lint and build Debug APK
         run: |
           cd koy-auto
-          ./gradlew testDebugUnitTest lintDebug assembleDebug --stacktrace
+          set -o pipefail
+          ./gradlew testDebugUnitTest lintDebug assembleDebug --stacktrace --console=plain 2>&1 | tee build.log
+
+      - name: Publish build diagnostics
+        if: always()
+        run: |
+          echo '## Gradle diagnostics (last 200 lines)' >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          tail -n 200 koy-auto/build.log >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload APK Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: KoY-Auto-Debug-APK
           path: koy-auto/app/build/outputs/apk/debug/*.apk
+
+      - name: Upload Gradle log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KoY-Auto-Gradle-Log
+          path: koy-auto/build.log
