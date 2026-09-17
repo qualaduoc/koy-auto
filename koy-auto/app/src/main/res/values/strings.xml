@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">KoY-Auto</string>
+    <string name="car_presentation_title">KoY-Auto CarPlay/AndroidAuto Player</string>
+    <string name="btn_home">Trang chủ</string>
+    <string name="btn_back">Quay lại</string>
+    <string name="btn_forward">Tiếp theo</string>
+    <string name="btn_reload">Làm mới</string>
+    <string name="btn_fullscreen">Toàn màn hình</string>
+    <string name="btn_dim_screen">Hạ độ sáng điện thoại</string>
+    <string name="status_car_connected">Đã kết nối màn hình ô tô</string>
+    <string name="status_car_disconnected">Chưa kết nối màn hình ô tô</string>
+    <string name="adblock_active">Chặn quảng cáo: BẬT</string>
+    <string name="adblock_inactive">Chặn quảng cáo: TẮT</string>
+    <string name="quick_music">🎵 Nhạc Lái Xe</string>
+    <string name="quick_news">📻 VOV / Tin Tức</string>
+    <string name="quick_podcast">🎙️ Sách Nói / Podcast</string>
+</resources>
