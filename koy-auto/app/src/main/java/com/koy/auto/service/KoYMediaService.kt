@@ -30,7 +30,32 @@ class KoYMediaService : MediaBrowserServiceCompat() {
 
             setPlaybackState(stateBuilder.build())
 
+            val mediaButtonIntent = android.content.Intent(android.content.Intent.ACTION_MEDIA_BUTTON).apply {
+                setClass(this@KoYMediaService, androidx.media.session.MediaButtonReceiver::class.java)
+            }
+            val pendingMediaButton = android.app.PendingIntent.getBroadcast(
+                this@KoYMediaService,
+                0,
+                mediaButtonIntent,
+                android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+            setMediaButtonReceiver(pendingMediaButton)
+
             setCallback(object : MediaSessionCompat.Callback() {
+                override fun onPlay() {
+                    val intent = android.content.Intent(com.koy.auto.util.Constants.ACTION_TOGGLE_PLAYBACK).apply {
+                        setPackage(packageName)
+                    }
+                    sendBroadcast(intent)
+                }
+
+                override fun onPause() {
+                    val intent = android.content.Intent(com.koy.auto.util.Constants.ACTION_TOGGLE_PLAYBACK).apply {
+                        setPackage(packageName)
+                    }
+                    sendBroadcast(intent)
+                }
+
                 override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
                     val targetUrl = when (mediaId) {
                         "music" -> com.koy.auto.util.Constants.URL_DRIVER_MUSIC
@@ -53,6 +78,11 @@ class KoYMediaService : MediaBrowserServiceCompat() {
 
         // Also ensure projection service starts
         CarProjectionService.start(this)
+    }
+
+    override fun onStartCommand(intent: android.content.Intent?, flags: Int, startId: Int): Int {
+        androidx.media.session.MediaButtonReceiver.handleIntent(mediaSession, intent)
+        return super.onStartCommand(intent, flags, startId)
     }
 
     override fun onGetRoot(

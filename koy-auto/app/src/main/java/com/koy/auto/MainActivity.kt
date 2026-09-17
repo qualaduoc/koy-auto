@@ -1,6 +1,7 @@
 package com.koy.auto
 
 import android.Manifest
+import android.app.PictureInPictureParams
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
@@ -8,9 +9,11 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.util.Rational
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
@@ -251,6 +254,35 @@ class MainActivity : AppCompatActivity() {
         }
         if (permissionsToRequest.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, permissionsToRequest.toTypedArray(), 1002)
+        }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        // Khi người dùng bấm nút Home hoặc chuyển sang app bản đồ (Google Maps), tự động thu nhỏ thành cửa sổ nổi PiP
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                val params = PictureInPictureParams.Builder()
+                    .setAspectRatio(Rational(16, 9))
+                    .build()
+                enterPictureInPictureMode(params)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        if (isInPictureInPictureMode) {
+            binding.cardInput.visibility = View.GONE
+            binding.topBar.visibility = View.GONE
+        } else {
+            binding.cardInput.visibility = View.VISIBLE
+            binding.topBar.visibility = View.VISIBLE
         }
     }
 
