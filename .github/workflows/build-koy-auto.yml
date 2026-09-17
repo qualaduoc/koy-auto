@@ -39,7 +39,7 @@ jobs:
           tail -n 200 koy-auto/build.log >> "$GITHUB_STEP_SUMMARY" || true
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           if grep -q 'BUILD FAILED' koy-auto/build.log; then
-            DIAGNOSTIC="$(tail -n 100 koy-auto/build.log)"
+            DIAGNOSTIC="$(grep -E -B 2 -A 10 '(^e: |error: |What went wrong|Execution failed for task|Caused by:)' koy-auto/build.log | head -n 100)"
             DIAGNOSTIC="${DIAGNOSTIC//'%'/'%25'}"
             DIAGNOSTIC="${DIAGNOSTIC//$'\r'/'%0D'}"
             DIAGNOSTIC="${DIAGNOSTIC//$'\n'/'%0A'}"
