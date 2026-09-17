@@ -18,5 +18,6 @@ object Constants {
     const val ACTION_START_PROJECTION = "com.koy.auto.action.START_PROJECTION"
     const val ACTION_STOP_PROJECTION = "com.koy.auto.action.STOP_PROJECTION"
     const val ACTION_LOAD_URL = "com.koy.auto.action.LOAD_URL"
+    const val ACTION_TOGGLE_PLAYBACK = "com.koy.auto.action.TOGGLE_PLAYBACK"
     const val EXTRA_URL = "extra_url"
 }

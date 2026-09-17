@@ -109,6 +109,26 @@ class CarPresentation(
         }
     }
 
+    fun togglePlayback() {
+        if (::webView.isInitialized) {
+            val jsToggle = """
+                (function() {
+                    var v = document.querySelector('video');
+                    if (v) {
+                        if (v.paused) {
+                            window._koyUserWantsPause = false;
+                            v.play();
+                        } else {
+                            window._koyUserWantsPause = true;
+                            v.pause();
+                        }
+                    }
+                })();
+            """.trimIndent()
+            webView.evaluateJavascript(jsToggle, null)
+        }
+    }
+
     override fun onDetachedFromWindow() {
         if (::webView.isInitialized) {
             webView.cleanUp()

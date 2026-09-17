@@ -5,12 +5,17 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.net.wifi.WifiManager
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.koy.auto.MainActivity
 import com.koy.auto.R
 import com.koy.auto.presentation.CarDisplayManager
@@ -24,6 +29,16 @@ class CarProjectionService : Service() {
         private set
 
     private lateinit var audioFocusHelper: AudioFocusHelper
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
+
+    private val serviceReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Constants.ACTION_TOGGLE_PLAYBACK) {
+                carDisplayManager.togglePlayback()
+            }
+        }
+    }
 
     inner class LocalBinder : Binder() {
         fun getService(): CarProjectionService = this@CarProjectionService
@@ -33,6 +48,37 @@ class CarProjectionService : Service() {
         super.onCreate()
         carDisplayManager = CarDisplayManager(this)
         carDisplayManager.startListening()
+
+        // Đăng ký nhận sự kiện điều khiển Play/Pause từ Notification
+        val filter = IntentFilter(Constants.ACTION_TOGGLE_PLAYBACK)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(serviceReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(serviceReceiver, filter)
+        }
+
+        // 1. Acquire WakeLock to keep CPU running when screen is locked/turned off
+        try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "KoYAuto:PlaybackWakeLock").apply {
+                setReferenceCounted(false)
+                acquire(8 * 60 * 60 * 1000L) // Keep alive up to 8 hours
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        // 2. Acquire WifiLock for seamless streaming when screen is off
+        try {
+            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            @Suppress("DEPRECATION")
+            wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "KoYAuto:WifiLock").apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         audioFocusHelper = AudioFocusHelper(
             context = this,
@@ -87,11 +133,37 @@ class CarProjectionService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
+        val playPauseIntent = Intent(Constants.ACTION_TOGGLE_PLAYBACK).apply {
+            setPackage(packageName)
+        }
+        val pendingPlayPause = PendingIntent.getBroadcast(
+            this,
+            1,
+            playPauseIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val stopIntent = Intent(this, CarProjectionService::class.java).apply {
+            action = Constants.ACTION_STOP_PROJECTION
+        }
+        val pendingStop = PendingIntent.getService(
+            this,
+            2,
+            stopIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
         return NotificationCompat.Builder(this, channelId)
-            .setContentTitle("KoY-Auto đang chạy trên xe")
-            .setContentText("Chạm để mở bảng điều khiển trên điện thoại")
-            .setSmallIcon(R.drawable.ic_home)
+            .setContentTitle("KoY-Auto đang phát ngầm")
+            .setContentText("YouTube đang phát qua loa ô tô")
+            .setSmallIcon(R.drawable.ic_app_logo)
             .setContentIntent(pendingIntent)
+            .addAction(R.drawable.ic_refresh, "Phát / Dừng", pendingPlayPause)
+            .addAction(R.drawable.ic_back, "Tắt", pendingStop)
+            .setStyle(
+                androidx.media.app.NotificationCompat.MediaStyle()
+                    .setShowActionsInCompactView(0, 1)
+            )
             .setOngoing(true)
             .build()
     }
@@ -99,6 +171,17 @@ class CarProjectionService : Service() {
     override fun onBind(intent: Intent?): IBinder = binder
 
     override fun onDestroy() {
+        try {
+            unregisterReceiver(serviceReceiver)
+        } catch (e: Exception) {
+            // Ignore
+        }
+        try {
+            if (wakeLock?.isHeld == true) wakeLock?.release()
+            if (wifiLock?.isHeld == true) wifiLock?.release()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         audioFocusHelper.abandonAudioFocus()
         carDisplayManager.stopListening()
         super.onDestroy()

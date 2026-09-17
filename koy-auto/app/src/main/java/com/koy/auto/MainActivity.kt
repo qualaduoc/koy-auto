@@ -1,9 +1,11 @@
 package com.koy.auto
 
 import android.Manifest
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
@@ -30,6 +32,14 @@ class MainActivity : AppCompatActivity() {
     private var projectionService: CarProjectionService? = null
     private var isBound = false
 
+    private val playbackReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Constants.ACTION_TOGGLE_PLAYBACK) {
+                togglePlayback()
+            }
+        }
+    }
+
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             val binder = service as CarProjectionService.LocalBinder
@@ -52,6 +62,14 @@ class MainActivity : AppCompatActivity() {
         // Ensure background projection service is running
         CarProjectionService.start(this)
 
+        // Đăng ký nhận sự kiện điều khiển Play/Pause từ thông báo Notification
+        val filter = IntentFilter(Constants.ACTION_TOGGLE_PLAYBACK)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(playbackReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(playbackReceiver, filter)
+        }
+
         setupPhoneWebView()
         setupListeners()
         handleIncomingIntent(intent)
@@ -64,12 +82,37 @@ class MainActivity : AppCompatActivity() {
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 
+    override fun onPause() {
+        super.onPause()
+        // Giữ JavaScript timers tiếp tục chạy để âm thanh và auto-skip ad không bị đóng băng khi tắt màn hình
+        binding.phoneWebView.resumeTimers()
+    }
+
     override fun onStop() {
         if (isBound) {
             unbindService(serviceConnection)
             isBound = false
         }
+        binding.phoneWebView.resumeTimers()
         super.onStop()
+    }
+
+    private fun togglePlayback() {
+        val jsToggle = """
+            (function() {
+                var v = document.querySelector('video');
+                if (v) {
+                    if (v.paused) {
+                        window._koyUserWantsPause = false;
+                        v.play();
+                    } else {
+                        window._koyUserWantsPause = true;
+                        v.pause();
+                    }
+                }
+            })();
+        """.trimIndent()
+        binding.phoneWebView.evaluateJavascript(jsToggle, null)
     }
 
     private fun setupPhoneWebView() {
@@ -186,11 +229,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @Suppress("DEPRECATION")
     override fun onBackPressed() {
         if (binding.phoneWebView.canGoBack()) {
             binding.phoneWebView.goBack()
         } else {
-            super.onBackPressed()
+            // Ẩn ứng dụng xuống nền thay vì đóng hẳn, giúp duy trì âm thanh chạy ngầm
+            moveTaskToBack(true)
         }
     }
 
@@ -210,6 +255,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        try {
+            unregisterReceiver(playbackReceiver)
+        } catch (e: Exception) {
+            // Ignore
+        }
         binding.phoneWebView.cleanUp()
         super.onDestroy()
     }

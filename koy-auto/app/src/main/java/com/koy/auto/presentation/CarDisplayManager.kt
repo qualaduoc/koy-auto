@@ -87,6 +87,10 @@ class CarDisplayManager(private val context: Context) : DisplayManager.DisplayLi
         activePresentation?.setAdBlockEnabled(enabled)
     }
 
+    fun togglePlayback() {
+        activePresentation?.togglePlayback()
+    }
+
     override fun onDisplayAdded(displayId: Int) {
         val display = displayManager.getDisplay(displayId)
         if (display != null && display.displayId != Display.DEFAULT_DISPLAY) {

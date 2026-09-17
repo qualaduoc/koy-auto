@@ -62,10 +62,38 @@ class KoYWebViewClient(
         val backgroundPlayJs = """
             (function() {
                 try {
-                    Object.defineProperty(document, 'hidden', { get: function() { return false; } });
-                    Object.defineProperty(document, 'visibilityState', { get: function() { return 'visible'; } });
-                    document.dispatchEvent(new Event('visibilitychange'));
+                    Object.defineProperty(document, 'hidden', { get: function() { return false; }, configurable: true });
+                    Object.defineProperty(document, 'visibilityState', { get: function() { return 'visible'; }, configurable: true });
                 } catch(e) {}
+
+                // Ngăn chặn YouTube lắng nghe sự kiện ẩn màn hình
+                window.addEventListener('visibilitychange', function(e) {
+                    e.stopImmediatePropagation();
+                }, true);
+
+                // Theo dõi tương tác người dùng: nếu người dùng bấm chạm thì ghi nhận
+                document.addEventListener('pointerdown', function() {
+                    window._koyUserInteracted = Date.now();
+                }, true);
+
+                if (!window._koyVideoHooked) {
+                    window._koyVideoHooked = true;
+                    setInterval(function() {
+                        var v = document.querySelector('video');
+                        if (v && !v._koyListened) {
+                            v._koyListened = true;
+                            v.addEventListener('pause', function(e) {
+                                var elapsedSinceTouch = Date.now() - (window._koyUserInteracted || 0);
+                                // Nếu tạm dừng do tắt màn hình (hệ thống tự pause, không có touch gần đây)
+                                if (elapsedSinceTouch > 600 && !window._koyUserWantsPause && !v.ended) {
+                                    setTimeout(function() {
+                                        try { v.play(); } catch(err) {}
+                                    }, 150);
+                                }
+                            });
+                        }
+                    }, 1000);
+                }
             })();
         """.trimIndent()
         view?.evaluateJavascript(backgroundPlayJs, null)
@@ -87,6 +115,24 @@ class KoYWebViewClient(
             })();
         """.trimIndent()
         view?.evaluateJavascript(autoSkipAdsJs, null)
+
+        // 4. Destroy YouTube anti-adblock enforcement modal if it pops up
+        val antiAdblockBypassJs = """
+            (function() {
+                if (window._koyAntiAdblockInterval) return;
+                window._koyAntiAdblockInterval = setInterval(function() {
+                    var adblockDialog = document.querySelector('ytd-enforcement-message-view-model, tp-yt-paper-dialog.ytd-popup-container');
+                    if (adblockDialog) {
+                        adblockDialog.remove();
+                        var backdrop = document.querySelector('tp-yt-iron-overlay-backdrop');
+                        if (backdrop) backdrop.remove();
+                        var v = document.querySelector('video');
+                        if (v && v.paused) { v.play(); }
+                    }
+                }, 1000);
+            })();
+        """.trimIndent()
+        view?.evaluateJavascript(antiAdblockBypassJs, null)
 
         url?.let { onPageFinishedCallback?.invoke(it) }
     }
