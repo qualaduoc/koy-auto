@@ -35,10 +35,12 @@ class CarProjectionService : Service() {
     private val serviceReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == Constants.ACTION_TOGGLE_PLAYBACK) {
+                com.koy.auto.player.KoYPlayerManager.togglePlayPause()
                 carDisplayManager.togglePlayback()
             }
         }
     }
+
 
     inner class LocalBinder : Binder() {
         fun getService(): CarProjectionService = this@CarProjectionService

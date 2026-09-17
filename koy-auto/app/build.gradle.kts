@@ -46,4 +46,15 @@ dependencies {
     implementation("androidx.webkit:webkit:1.10.0")
     implementation("androidx.media:media:1.7.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // Media3 ExoPlayer Engine for High-Performance, Zero-Lag Playback
+    implementation("androidx.media3:media3-exoplayer:1.2.1")
+    implementation("androidx.media3:media3-ui:1.2.1")
+    implementation("androidx.media3:media3-session:1.2.1")
+    implementation("androidx.media3:media3-common:1.2.1")
+    implementation("androidx.media3:media3-datasource-okhttp:1.2.1")
+
+    // OkHttp for ultra-fast stream extraction
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }
+

@@ -2,9 +2,11 @@ package com.koy.auto.service
 
 import android.os.Bundle
 import android.support.v4.media.MediaBrowserCompat
+import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.media.MediaBrowserServiceCompat
+import com.koy.auto.player.KoYPlayerManager
 
 class KoYMediaService : MediaBrowserServiceCompat() {
 
@@ -12,6 +14,8 @@ class KoYMediaService : MediaBrowserServiceCompat() {
 
     override fun onCreate() {
         super.onCreate()
+
+        KoYPlayerManager.initialize(this)
 
         mediaSession = MediaSessionCompat(this, "KoYMediaSession").apply {
             setFlags(
@@ -23,10 +27,12 @@ class KoYMediaService : MediaBrowserServiceCompat() {
                 .setActions(
                     PlaybackStateCompat.ACTION_PLAY or
                     PlaybackStateCompat.ACTION_PAUSE or
+                    PlaybackStateCompat.ACTION_PLAY_PAUSE or
                     PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-                    PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+                    PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                    PlaybackStateCompat.ACTION_SEEK_TO
                 )
-                .setState(PlaybackStateCompat.STATE_PLAYING, 0, 1.0f)
+                .setState(PlaybackStateCompat.STATE_PAUSED, 0, 1.0f)
 
             setPlaybackState(stateBuilder.build())
 
@@ -43,36 +49,58 @@ class KoYMediaService : MediaBrowserServiceCompat() {
 
             setCallback(object : MediaSessionCompat.Callback() {
                 override fun onPlay() {
-                    val intent = android.content.Intent(com.koy.auto.util.Constants.ACTION_TOGGLE_PLAYBACK).apply {
-                        setPackage(packageName)
-                    }
-                    sendBroadcast(intent)
+                    KoYPlayerManager.resume()
                 }
 
                 override fun onPause() {
-                    val intent = android.content.Intent(com.koy.auto.util.Constants.ACTION_TOGGLE_PLAYBACK).apply {
-                        setPackage(packageName)
-                    }
-                    sendBroadcast(intent)
+                    KoYPlayerManager.pause()
+                }
+
+                override fun onSkipToNext() {
+                    KoYPlayerManager.seekForward(10000L)
+                }
+
+                override fun onSkipToPrevious() {
+                    KoYPlayerManager.seekBack(10000L)
+                }
+
+                override fun onSeekTo(pos: Long) {
+                    KoYPlayerManager.seekTo(pos)
                 }
 
                 override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
-                    val targetUrl = when (mediaId) {
-                        "music" -> com.koy.auto.util.Constants.URL_DRIVER_MUSIC
-                        "news" -> com.koy.auto.util.Constants.URL_VOV_NEWS
-                        "podcast" -> com.koy.auto.util.Constants.URL_PODCAST
-                        else -> com.koy.auto.util.Constants.YOUTUBE_URL_MOBILE
-                    }
-                    val intent = android.content.Intent(this@KoYMediaService, CarProjectionService::class.java).apply {
-                        action = com.koy.auto.util.Constants.ACTION_LOAD_URL
-                        putExtra(com.koy.auto.util.Constants.EXTRA_URL, targetUrl)
-                    }
-                    startService(intent)
+                    val id = mediaId ?: "music"
+                    KoYPlayerManager.playPredefined(id)
                 }
             })
 
             isActive = true
         }
+
+        // Lắng nghe cập nhật trạng thái từ KoYPlayerManager để đẩy lên Android Auto
+        KoYPlayerManager.onSessionStateChange = { title, artist, isPlaying, durationMs, positionMs ->
+            val state = if (isPlaying) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
+            val stateBuilder = PlaybackStateCompat.Builder()
+                .setActions(
+                    PlaybackStateCompat.ACTION_PLAY or
+                    PlaybackStateCompat.ACTION_PAUSE or
+                    PlaybackStateCompat.ACTION_PLAY_PAUSE or
+                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                    PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                    PlaybackStateCompat.ACTION_SEEK_TO
+                )
+                .setState(state, positionMs, 1.0f)
+            mediaSession.setPlaybackState(stateBuilder.build())
+
+            val metadata = MediaMetadataCompat.Builder()
+                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist)
+                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "KoY Auto")
+                .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, durationMs)
+                .build()
+            mediaSession.setMetadata(metadata)
+        }
+
 
         sessionToken = mediaSession.sessionToken
 
@@ -117,6 +145,7 @@ class KoYMediaService : MediaBrowserServiceCompat() {
     }
 
     override fun onDestroy() {
+        KoYPlayerManager.onSessionStateChange = null
         mediaSession.release()
         super.onDestroy()
     }

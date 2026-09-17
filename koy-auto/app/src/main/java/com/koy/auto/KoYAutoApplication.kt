@@ -9,5 +9,8 @@ class KoYAutoApplication : Application() {
 
         // Enable remote debugging of WebView via Chrome devtools on PC (chrome://inspect)
         WebView.setWebContentsDebuggingEnabled(true)
+
+        // Initialize Media3 ExoPlayer Engine
+        com.koy.auto.player.KoYPlayerManager.initialize(this)
     }
 }

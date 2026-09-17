@@ -9,7 +9,9 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
+import androidx.media3.ui.PlayerView
 import com.koy.auto.R
+import com.koy.auto.player.KoYPlayerManager
 import com.koy.auto.util.Constants
 import com.koy.auto.webview.KoYWebChromeClient
 import com.koy.auto.webview.KoYWebView
@@ -20,6 +22,7 @@ class CarPresentation(
     display: Display
 ) : Presentation(outerContext, display, R.style.Theme_KoYAuto_Presentation) {
 
+    private lateinit var carPlayerView: PlayerView
     private lateinit var webView: KoYWebView
     private lateinit var customViewContainer: FrameLayout
     private lateinit var floatingControlBar: View
@@ -43,6 +46,7 @@ class CarPresentation(
     }
 
     private fun initViews() {
+        carPlayerView = findViewById(R.id.carPlayerView)
         webView = findViewById(R.id.carWebView)
         customViewContainer = findViewById(R.id.customViewContainer)
         floatingControlBar = findViewById(R.id.floatingControlBar)
@@ -52,6 +56,9 @@ class CarPresentation(
         btnFullscreen = findViewById(R.id.btnFullscreen)
         ivAdBlockStatus = findViewById(R.id.ivAdBlockStatus)
 
+        // Gắn PlayerView vào KoYPlayerManager để xuất video trực tiếp lên màn hình xe
+        KoYPlayerManager.attachPlayerView(carPlayerView)
+
         webViewClient = KoYWebViewClient(isAdBlockEnabled = true)
         webView.webViewClient = webViewClient!!
 
@@ -60,6 +67,7 @@ class CarPresentation(
         }
         webView.webChromeClient = webChromeClient
     }
+
 
     private fun setupListeners() {
         btnBack.setOnClickListener {
@@ -71,15 +79,30 @@ class CarPresentation(
         }
 
         btnHome.setOnClickListener {
+            showBrowserView()
             loadUrl(Constants.YOUTUBE_URL_MOBILE)
         }
 
         btnReload.setOnClickListener {
-            webView.reload()
+            if (carPlayerView.visibility == View.VISIBLE) {
+                KoYPlayerManager.resume()
+            } else {
+                webView.reload()
+            }
         }
 
         btnFullscreen.setOnClickListener {
-            webView.triggerFullscreenJs()
+            if (carPlayerView.visibility == View.VISIBLE) {
+                // Đổi chế độ fit / zoom tràn viền màn hình xe
+                val currentMode = carPlayerView.resizeMode
+                carPlayerView.resizeMode = if (currentMode == androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT) {
+                    androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                } else {
+                    androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                }
+            } else {
+                webView.triggerFullscreenJs()
+            }
         }
 
         ivAdBlockStatus.setOnClickListener {
@@ -90,15 +113,34 @@ class CarPresentation(
         }
     }
 
+    fun showNativePlayer() {
+        carPlayerView.visibility = View.VISIBLE
+        webView.visibility = View.GONE
+    }
+
+    fun showBrowserView() {
+        carPlayerView.visibility = View.GONE
+        webView.visibility = View.VISIBLE
+    }
+
     private fun loadInitialPage() {
         webView.loadUrl(initialUrlToLoad)
     }
 
     fun loadUrl(url: String) {
-        if (::webView.isInitialized) {
-            webView.loadUrl(url)
+        val videoId = com.koy.auto.player.YouTubeStreamExtractor.extractVideoId(url)
+        if (videoId != null) {
+            // Là link video YouTube: Chuyển sang Native ExoPlayer chạy mượt 60 FPS, không dùng WebView
+            showNativePlayer()
+            KoYPlayerManager.playYouTube(url)
         } else {
-            initialUrlToLoad = url
+            // Là link trang web tìm kiếm: Hiển thị giao diện web
+            showBrowserView()
+            if (::webView.isInitialized) {
+                webView.loadUrl(url)
+            } else {
+                initialUrlToLoad = url
+            }
         }
     }
 
@@ -110,7 +152,9 @@ class CarPresentation(
     }
 
     fun togglePlayback() {
-        if (::webView.isInitialized) {
+        if (carPlayerView.visibility == View.VISIBLE) {
+            KoYPlayerManager.togglePlayPause()
+        } else if (::webView.isInitialized) {
             val jsToggle = """
                 (function() {
                     var v = document.querySelector('video');
@@ -130,9 +174,13 @@ class CarPresentation(
     }
 
     override fun onDetachedFromWindow() {
+        if (::carPlayerView.isInitialized) {
+            KoYPlayerManager.detachPlayerView(carPlayerView)
+        }
         if (::webView.isInitialized) {
             webView.cleanUp()
         }
         super.onDetachedFromWindow()
     }
 }
+

@@ -141,15 +141,18 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.chipMusic.setOnClickListener {
-            playUrl(Constants.URL_DRIVER_MUSIC)
+            com.koy.auto.player.KoYPlayerManager.playPredefined("music")
+            Toast.makeText(this, "Đang phát: 🎵 Nhạc Lái Xe Lo-fi", Toast.LENGTH_SHORT).show()
         }
 
         binding.chipNews.setOnClickListener {
-            playUrl(Constants.URL_VOV_NEWS)
+            com.koy.auto.player.KoYPlayerManager.playPredefined("news")
+            Toast.makeText(this, "Đang phát: 📻 VOV Giao Thông trực tiếp", Toast.LENGTH_SHORT).show()
         }
 
         binding.chipPodcast.setOnClickListener {
-            playUrl(Constants.URL_PODCAST)
+            com.koy.auto.player.KoYPlayerManager.playPredefined("podcast")
+            Toast.makeText(this, "Đang phát: 🎙️ Sách Nói & Podcast", Toast.LENGTH_SHORT).show()
         }
 
         binding.switchAdBlock.setOnCheckedChangeListener { _, isChecked ->
@@ -169,6 +172,33 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun playUrl(urlOrSearch: String) {
+        val videoId = com.koy.auto.player.YouTubeStreamExtractor.extractVideoId(urlOrSearch)
+
+        if (videoId != null) {
+            // Phát luồng trực tiếp qua ExoPlayer phần cứng (siêu nhẹ, không giật lag)
+            Toast.makeText(this, "Đang giải mã và phát video siêu nhẹ...", Toast.LENGTH_SHORT).show()
+            com.koy.auto.player.KoYPlayerManager.playYouTube(
+                urlOrId = urlOrSearch,
+                onStart = {
+                    this@MainActivity.runOnUiThread {
+                        Toast.makeText(this@MainActivity, "Đang phát 60 FPS mượt mà!", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onError = { errMsg ->
+                    this@MainActivity.runOnUiThread {
+                        Toast.makeText(this@MainActivity, "Lỗi: $errMsg", Toast.LENGTH_LONG).show()
+                    }
+                }
+            )
+
+
+            // Đồng thời xuất lên màn hình xe nếu đang kết nối
+            if (projectionService?.carDisplayManager?.isCarConnected?.value == true) {
+                projectionService?.carDisplayManager?.loadUrlOnCar(urlOrSearch)
+            }
+            return
+        }
+
         val targetUrl = if (urlOrSearch.startsWith("http://") || urlOrSearch.startsWith("https://")) {
             urlOrSearch
         } else {
@@ -185,6 +215,7 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Đang phát trên màn hình điện thoại", Toast.LENGTH_SHORT).show()
         }
     }
+
 
     private fun observeCarStatus() {
         val service = projectionService ?: return
