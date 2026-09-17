@@ -28,18 +28,10 @@ jobs:
       - name: Build Debug APK
         run: |
           cd koy-auto
-          ./gradlew assembleDebug --stacktrace 2>&1 | tee ../build.log
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK Artifact
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: KoY-Auto-Debug-APK
           path: koy-auto/app/build/outputs/apk/debug/*.apk
-
-      - name: Upload Build Log on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Build-Failure-Log
-          path: build.log

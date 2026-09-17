@@ -57,49 +57,30 @@ class KoYMediaService : MediaBrowserServiceCompat() {
                 }
 
                 override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
-                    val safeId = mediaId ?: "music"
-                    val (title, subtitle, targetUrl) = when (safeId) {
-                        "music" -> Triple("🎵 Nhạc Lái Xe", "YouTube Lo-fi không lời", com.koy.auto.util.Constants.URL_DRIVER_MUSIC)
-                        "news" -> Triple("📻 VOV Giao Thông", "Tin tức trực tiếp", com.koy.auto.util.Constants.URL_VOV_NEWS)
-                        "podcast" -> Triple("🎙️ Sách Nói & Podcast", "Kinh doanh, kỹ năng", com.koy.auto.util.Constants.URL_PODCAST)
-                        else -> Triple("▶️ YouTube", "Đang phát", com.koy.auto.util.Constants.YOUTUBE_URL_MOBILE)
+                    val targetUrl = when (mediaId) {
+                        "music" -> com.koy.auto.util.Constants.URL_DRIVER_MUSIC
+                        "news" -> com.koy.auto.util.Constants.URL_VOV_NEWS
+                        "podcast" -> com.koy.auto.util.Constants.URL_PODCAST
+                        else -> com.koy.auto.util.Constants.YOUTUBE_URL_MOBILE
                     }
 
-                    try {
-                        // 1. Cập nhật Metadata cho Android Auto hiển thị màn hình Now Playing
-                        val metadata = android.support.v4.media.MediaMetadataCompat.Builder()
-                            .putString(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_MEDIA_ID, safeId)
-                            .putString(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_TITLE, title)
-                            .putString(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_ARTIST, subtitle)
-                            .putString(android.support.v4.media.MediaMetadataCompat.METADATA_KEY_ALBUM, "KoY-Auto")
-                            .build()
-                        mediaSession.setMetadata(metadata)
+                    // Báo cho Android Auto chuyển ngay sang trạng thái đang phát (PLAYING) để không bị lỗi timeout
+                    val playingState = PlaybackStateCompat.Builder()
+                        .setActions(
+                            PlaybackStateCompat.ACTION_PLAY or
+                            PlaybackStateCompat.ACTION_PAUSE or
+                            PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                            PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+                        )
+                        .setState(PlaybackStateCompat.STATE_PLAYING, 0, 1.0f)
+                        .build()
+                    mediaSession.setPlaybackState(playingState)
 
-                        // 2. Cập nhật trạng thái đang phát (PLAYING) để Android Auto chuyển sang màn hình phát nhạc
-                        val playingState = PlaybackStateCompat.Builder()
-                            .setActions(
-                                PlaybackStateCompat.ACTION_PLAY or
-                                PlaybackStateCompat.ACTION_PAUSE or
-                                PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-                                PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
-                            )
-                            .setState(PlaybackStateCompat.STATE_PLAYING, 0L, 1.0f)
-                            .build()
-                        mediaSession.setPlaybackState(playingState)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
+                    val intent = android.content.Intent(this@KoYMediaService, CarProjectionService::class.java).apply {
+                        action = com.koy.auto.util.Constants.ACTION_LOAD_URL
+                        putExtra(com.koy.auto.util.Constants.EXTRA_URL, targetUrl)
                     }
-
-                    // 3. Ra lệnh cho MainActivity tải URL và phát âm thanh qua loa xe
-                    try {
-                        val playIntent = android.content.Intent(this@KoYMediaService, com.koy.auto.MainActivity::class.java).apply {
-                            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
-                            data = android.net.Uri.parse(targetUrl)
-                        }
-                        startActivity(playIntent)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
+                    startService(intent)
                 }
             })
 
