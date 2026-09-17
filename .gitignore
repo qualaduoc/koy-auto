@@ -89,12 +89,54 @@ fastlane/test_output
 
 iOSInjectionProject/
 
-# Android
+# Android & Gradle
 .gradle/
 **/build/
 !gradle-wrapper.jar
+!**/gradle/wrapper/gradle-wrapper.jar
 local.properties
 *.apk
+*.ap_
 *.aab
+*.dex
+*.class
 *.keystore
 *.jks
+.cxx/
+captures/
+.externalNativeBuild/
+
+# IDEs & System Files
+.idea/
+*.iml
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+
+# Node.js & Web
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+.turbo/
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+venv/
+.venv/
+env/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
