@@ -28,17 +28,9 @@ jobs:
       - name: Build Debug APK
         run: |
           cd koy-auto
-          ./gradlew assembleDebug --stacktrace > ../build_output.txt 2>&1 || (cat ../build_output.txt && exit 1)
-
-      - name: Upload Build Log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: build_output.txt
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK Artifact
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: KoY-Auto-Debug-APK

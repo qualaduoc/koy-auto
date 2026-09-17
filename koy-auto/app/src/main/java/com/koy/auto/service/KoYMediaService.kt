@@ -63,19 +63,6 @@ class KoYMediaService : MediaBrowserServiceCompat() {
                         "podcast" -> com.koy.auto.util.Constants.URL_PODCAST
                         else -> com.koy.auto.util.Constants.YOUTUBE_URL_MOBILE
                     }
-
-                    // Báo cho Android Auto chuyển ngay sang trạng thái đang phát (PLAYING) để không bị lỗi timeout
-                    val playingState = PlaybackStateCompat.Builder()
-                        .setActions(
-                            PlaybackStateCompat.ACTION_PLAY or
-                            PlaybackStateCompat.ACTION_PAUSE or
-                            PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-                            PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
-                        )
-                        .setState(PlaybackStateCompat.STATE_PLAYING, 0, 1.0f)
-                        .build()
-                    mediaSession.setPlaybackState(playingState)
-
                     val intent = android.content.Intent(this@KoYMediaService, CarProjectionService::class.java).apply {
                         action = com.koy.auto.util.Constants.ACTION_LOAD_URL
                         putExtra(com.koy.auto.util.Constants.EXTRA_URL, targetUrl)
