@@ -140,3 +140,7 @@ env/
 .env
 .env.local
 .env.*.local
+
+# Temp raw assets
+/icon.png
+
