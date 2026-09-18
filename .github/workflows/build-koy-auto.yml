@@ -50,23 +50,25 @@ jobs:
             echo '```text' >> "$GITHUB_STEP_SUMMARY"
             cat koy-auto/app/build/reports/lint-results-debug.txt >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
-            LINT_DIAGNOSTIC="$(grep -E 'Error:|Warning:' koy-auto/app/build/reports/lint-results-debug.txt | head -n 80)"
-            LINT_DIAGNOSTIC="${LINT_DIAGNOSTIC//'%'/'%25'}"
-            LINT_DIAGNOSTIC="${LINT_DIAGNOSTIC//$'\r'/'%0D'}"
-            LINT_DIAGNOSTIC="${LINT_DIAGNOSTIC//$'\n'/'%0A'}"
-            echo "::error title=Android Lint::$LINT_DIAGNOSTIC"
+            if grep -q ' Error:' koy-auto/app/build/reports/lint-results-debug.txt; then
+              LINT_DIAGNOSTIC="$(grep ' Error:' koy-auto/app/build/reports/lint-results-debug.txt | head -n 80)"
+              LINT_DIAGNOSTIC="${LINT_DIAGNOSTIC//'%'/'%25'}"
+              LINT_DIAGNOSTIC="${LINT_DIAGNOSTIC//$'\r'/'%0D'}"
+              LINT_DIAGNOSTIC="${LINT_DIAGNOSTIC//$'\n'/'%0A'}"
+              echo "::error title=Android Lint::$LINT_DIAGNOSTIC"
+            fi
           fi
 
       - name: Upload APK Artifact
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: KoY-Auto-Debug-APK
           path: koy-auto/app/build/outputs/apk/debug/*.apk
 
       - name: Upload Gradle log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: KoY-Auto-Gradle-Log
           path: |
