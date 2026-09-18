@@ -45,6 +45,17 @@ jobs:
             DIAGNOSTIC="${DIAGNOSTIC//$'\n'/'%0A'}"
             echo "::error title=Gradle failure::$DIAGNOSTIC"
           fi
+          if [ -f koy-auto/app/build/reports/lint-results-debug.txt ]; then
+            echo '## Android Lint' >> "$GITHUB_STEP_SUMMARY"
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            cat koy-auto/app/build/reports/lint-results-debug.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            LINT_DIAGNOSTIC="$(grep -E 'Error:|Warning:' koy-auto/app/build/reports/lint-results-debug.txt | head -n 80)"
+            LINT_DIAGNOSTIC="${LINT_DIAGNOSTIC//'%'/'%25'}"
+            LINT_DIAGNOSTIC="${LINT_DIAGNOSTIC//$'\r'/'%0D'}"
+            LINT_DIAGNOSTIC="${LINT_DIAGNOSTIC//$'\n'/'%0A'}"
+            echo "::error title=Android Lint::$LINT_DIAGNOSTIC"
+          fi
 
       - name: Upload APK Artifact
         if: success()
@@ -58,4 +69,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: KoY-Auto-Gradle-Log
-          path: koy-auto/build.log
+          path: |
+            koy-auto/build.log
+            koy-auto/app/build/reports/lint-results-debug.*
