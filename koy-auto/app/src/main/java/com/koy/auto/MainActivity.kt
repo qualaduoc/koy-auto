@@ -1,6 +1,7 @@
 package com.koy.auto
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.PictureInPictureParams
 import android.content.ComponentName
 import android.content.Context
@@ -268,6 +269,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     @Suppress("DEPRECATION")
+    @SuppressLint("MissingSuperCall")
     override fun onBackPressed() {
         if (binding.phoneWebView.canGoBack()) {
             binding.phoneWebView.goBack()

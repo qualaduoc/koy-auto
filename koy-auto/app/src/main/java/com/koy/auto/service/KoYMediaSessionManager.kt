@@ -41,6 +41,16 @@ object KoYMediaSessionManager {
                 override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
                     KoYPlayerManager.playPredefined(mediaId ?: "music")
                 }
+
+                override fun onPlayFromSearch(query: String?, extras: Bundle?) {
+                    val mediaId = when {
+                        query.orEmpty().contains("giao thông", ignoreCase = true) -> "news"
+                        query.orEmpty().contains("vov2", ignoreCase = true) -> "podcast"
+                        query.orEmpty().contains("văn hóa", ignoreCase = true) -> "podcast"
+                        else -> "music"
+                    }
+                    KoYPlayerManager.playPredefined(mediaId)
+                }
             })
             setPlaybackState(buildPlaybackState(false, 0L))
             isActive = true
