@@ -17,7 +17,7 @@ import com.koy.auto.webview.KoYWebChromeClient
 import com.koy.auto.webview.KoYWebView
 import com.koy.auto.webview.KoYWebViewClient
 
-@androidx.media3.common.util.UnstableApi
+@androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
 class CarPresentation(
     outerContext: Context,
     display: Display
